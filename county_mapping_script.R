@@ -5,9 +5,10 @@ library(tidyverse)
 library(leaflet)
 library(scales)
 library(sf)
+library(cowplot)
 
 #read in data
-
+#
 #childhood lead exposure data
 Childhood_Lead_Exposure_testyear_ebll_census_data <- read_csv("data/Childhood_Lead_Exposure_testyear_ebll_census_data.csv")
 
@@ -20,12 +21,23 @@ year_built <- read_csv("data/year_built_by_tract/ACSDT5Y2024.B25034-Data.csv")
 #slc boundary shapefile
 slc_boundary <- read_sf("data/st_louis_boundary/County_Boundary%2C_Saint_Louis_County%2C_MN.shp")
 
+#MN cities bounary
+cities <- read_sf("data/dlh_boundary/CITIES1.shp")
+
 #tidy and clean data
 #
 #census tracts
 census_tracts$GEOID <- as.double(census_tracts$GEOID)#change GEOID to double
 
 lead_exposure_tracts <- left_join(census_tracts, lead_exposure, by = "GEOID") #join census tracts to lead exposure
+
+#cites
+#
+dlh <- filter(cities, FEATURE_NA == "Duluth") #filter to only Duluth
+
+dlh_4269 <- st_transform(dlh, crs = 4269)# project to 4269
+
+dlh_4269_bb <- st_as_sfc(st_bbox(dlh_4269)) #get dlh bounding box (for inset)
 
 #lead exposure
 slc_lead_exposure_tracts <- mutate(lead_exposure_tracts, 
@@ -103,20 +115,99 @@ year_built_percent <- select(year_built_cleaned,
 
 #join percent built prior to 1970 to slc exposure tracts
 slc_lead_exposure_tracts <- left_join(slc_lead_exposure_tracts, year_built_percent, 
-                                      by = "TRACTCE").
+                                      by = "TRACTCE")
+
+#add column for combined risk assessment with percentage of housing and lead poisoning incidence
+slc_lead_exposure_tracts <- mutate(slc_lead_exposure_tracts, 
+                                   risk_label = case_when(
+                                     Label == "Significantly higher (1-2 times)" | Label == "Significantly higher (3+ times)" &
+                                       percent_built_before_1970 >= 50 ~ ">50% buildings older than 1970 AND > EBLL incidence",
+                                     percent_built_before_1970 >= 50 ~ ">50% buildings older than 1970",
+                                     Label == "Significantly higher (1-2 times)" | Label == "Significantly higher (3+ times)" ~ "> EBLL incidence",
+                                     T ~ "<50% buildings older than 1970"))
 
 #read exposure tracts as sf
 slc_lead_exposure_tracts <- st_transform(slc_lead_exposure_tracts, crs = 4269)
 
+#read boundary as sf
+slc_boundary_sf <- st_transform(slc_boundary, crs = 4269)
+
+#Geospatial operations
+slc_lead_exposure_tracts_clip <- st_intersection(slc_lead_exposure_tracts, slc_boundary_sf)#clip slc_lead_exposure_tracts to slc boundary (removes tracts in Lake Superior)
+
+dlh_exposure_tracts <- st_intersection(slc_lead_exposure_tracts_clip, dlh_4269) #clip tracts in duluth
+
 #mapping
 #
-#interactive map of high lead exposure tracts
-leaflet(slc_lead_exposure_tracts) %>% 
-  addTiles()+
-  addPolygons(data = slc_lead_exposure_tracts)
+#plot county wide census tracts
+ggm_slc <- ggplot(slc_lead_exposure_tracts_clip)+
+  geom_sf(aes(fill = risk_label), 
+          alpha = 1, 
+          show.legend = F)+
+  geom_sf(data = dlh_4269_bb, 
+          fill = NA,
+          color = "black",
+          size = 1.2)+
+  theme(panel.background = element_blank(), 
+        axis.text = element_blank(), 
+        axis.ticks = element_blank(), 
+        legend.position = "right", 
+        legend.title.position = "top", 
+        legend.direction = "vertical")+
+  scale_fill_discrete(palette = c("gray", "orange", "coral"), 
+                      name = "")
 
-plot(slc_lead_exposure_tracts[1])
+  labs(title = "Estimated Housing Age and and EBLL Incidence in St. Louis County, MN", 
+       subtitle = "Sources: US Census Bureau, MDH",
+       caption = "Prepared by: James Miller")
+
+ggm_slc
+
+#plot Duluth tracts
+ggm_dlh <- ggplot(dlh_exposure_tracts)+
+  geom_sf(aes(fill = risk_label),
+          show.legend = F)+
+  geom_sf(data = dlh_4269_bb, 
+          fill = NA,
+          color = "black",
+          size = 1.2)+
+  theme_void()+
+  scale_fill_discrete(palette = c("gray", "orange", "coral"))
+  
+ggm_dlh
+  
+#inset map
+ggdraw()+
+  draw_plot(ggm_slc, 
+            x = -.2)+
+  draw_plot(ggm_dlh,
+            x = 0.45, 
+            y = 0.25,
+            width = 0.5,
+            height = 0.5)
+
+#leaflet mapping
+#
+#create palette for level of risk
+pal1 <- colorFactor(c("gray", 
+                      "orange",
+                      "yellow",
+                      "coral"),
+                    domain = slc_lead_exposure_tracts$risk_label)
 
 
+
+
+leaflet(slc_lead_exposure_tracts_clip) %>% 
+  addTiles() %>% 
+  addPolygons(fillColor = ~pal1(risk_label), 
+              label = ~risk_label, 
+              opacity = .5,
+              color = "black",
+              weight = 2,
+              fillOpacity = .5) %>% 
+  addLegend(values = ~risk_label,
+            pal = pal1, 
+            title = "Risk Label")
 
 

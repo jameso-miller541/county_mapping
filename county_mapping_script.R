@@ -29,7 +29,7 @@ cities <- read_sf("data/dlh_boundary/CITIES1.shp")
 #census tracts
 census_tracts$GEOID <- as.double(census_tracts$GEOID)#change GEOID to double
 
-lead_exposure_tracts <- left_join(census_tracts, lead_exposure, by = "GEOID") #join census tracts to lead exposure
+lead_exposure_tracts <- left_join(census_tracts, Childhood_Lead_Exposure_testyear_ebll_census_data, by = "GEOID") #join census tracts to lead exposure
 
 #cites
 #

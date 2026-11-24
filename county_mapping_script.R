@@ -164,9 +164,11 @@ ggm_slc <-
             aes(label = FEATURE_NA,
                 geometry = geometry),
             stat = "sf_coordinates",
+            color = "white",
+            fontface = "bold",
             size = 3.5,
-            nudge_y = 0,
-            nudge_x = .15)+
+            nudge_y = 0.05,
+            nudge_x = 0)+
   theme_void()+              #remove background
   scale_fill_discrete(palette = c("#A8B9D4", "orange", "coral"), 
                       name = "")+ # add palette for risk label
@@ -203,24 +205,24 @@ ggm_dlh <-
               stat = "sf_coordinates",
               size = 4,
               nudge_y = 0,
-              nudge_x = .085)+
+              nudge_x = .08)+
   scale_fill_discrete(palette = c("#A8B9D4", "orange", "coral"), #palette and legend name for risk label
                       name = "")+
-  theme(legend.position = c(0.4,1.2), #position legend
+  theme(legend.position = c(0.46,1.25), #position legend
         legend.direction = "vertical")
 
 ggm_dlh
   
 #inset map
-inset_map <- 
+#inset_map <- 
   ggdraw()+
   draw_plot(ggm_slc, 
             x = -.35)+ #add and position county map
   draw_plot(ggm_dlh,
-            x = 0.22, 
-            y = 0.25,
-            width = .45,
-            height = .45)+ #add, position, and size DLH inset
+            x = 0.14, 
+            y = 0.16,
+            width = .55,
+            height = .55)+ #add, position, and size DLH inset
   draw_label("Estimated Housing Age and and EBLL Incidence in St. Louis County, MN",
              fontface = "bold",
              x = 0,
@@ -235,12 +237,6 @@ inset_map <-
              size = 9,
              vjust = 29,
              hjust = .5)+ #attribution 
-  draw_line(x = c(0.225, 0.329),
-            y = c(0.045, 0.27), 
-            size = 1)+ #lines for inset
-  draw_line(x = c(0.225, 0.329),
-            y = c(0.15, .68), 
-            size = 1)+ #lines for inset
   theme(plot.margin = margin(1,1,1,1), #margin
         plot.background = element_rect(fill = "#FEEFDE")) #background color
 

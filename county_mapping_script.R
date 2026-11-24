@@ -6,6 +6,7 @@ library(leaflet)
 library(scales)
 library(sf)
 library(cowplot)
+library(ggspatial)
 
 #read in data
 #
@@ -33,11 +34,20 @@ lead_exposure_tracts <- left_join(census_tracts, Childhood_Lead_Exposure_testyea
 
 #cites
 #
+cities_4269 <- st_transform(cities, crs = 4269)# project to 4269
+#dlh bounding box
 dlh <- filter(cities, FEATURE_NA == "Duluth") #filter to only Duluth
 
-dlh_4269 <- st_transform(dlh, crs = 4269)# project to 4269
+dlh_4269_bb <- st_as_sfc(st_bbox(dlh)) #get dlh bounding box (for inset)
 
-dlh_4269_bb <- st_as_sfc(st_bbox(dlh_4269)) #get dlh bounding box (for inset)
+#other cities in SLC
+slc_cities <- filter(cities, FEATURE_NA == "Duluth"|
+                       FEATURE_NA == "Hibbing"|
+                       FEATURE_NA == "Virginia"|
+                       FEATURE_NA == "Ely"|
+                       FEATURE_NA == "Chisholm")
+#find cetnter point
+slc_cities_point <- st_centroid(slc_cities)
 
 #lead exposure
 slc_lead_exposure_tracts <- mutate(lead_exposure_tracts, 
@@ -135,12 +145,13 @@ slc_boundary_sf <- st_transform(slc_boundary, crs = 4269)
 #Geospatial operations
 slc_lead_exposure_tracts_clip <- st_intersection(slc_lead_exposure_tracts, slc_boundary_sf)#clip slc_lead_exposure_tracts to slc boundary (removes tracts in Lake Superior)
 
-dlh_exposure_tracts <- st_intersection(slc_lead_exposure_tracts_clip, dlh_4269) #clip tracts in duluth
+dlh_exposure_tracts <- st_intersection(slc_lead_exposure_tracts_clip, dlh_4269_bb) #clip tracts in duluth
 
 #mapping
 #
 #plot county wide census tracts
-ggm_slc <- ggplot(slc_lead_exposure_tracts_clip)+
+ggm_slc <-
+  ggplot(slc_lead_exposure_tracts_clip)+
   geom_sf(aes(fill = risk_label), 
           alpha = 1, 
           show.legend = F)+
@@ -148,20 +159,32 @@ ggm_slc <- ggplot(slc_lead_exposure_tracts_clip)+
           fill = NA,
           color = "black",
           size = .7)+
-  theme(panel.background = element_blank(), 
-        axis.text = element_blank(), 
-        axis.ticks = element_blank(), 
-        legend.position = "right", 
+  geom_sf(data = slc_cities_point)+
+  geom_text(data = slc_cities_point, 
+            aes(label = FEATURE_NA,
+                geometry = geometry),
+            stat = "sf_coordinates",
+            size = 3.5,
+            nudge_y = 0,
+            nudge_x = .12)+
+  theme(legend.position = "right", 
         legend.title.position = "top", 
         legend.direction = "vertical")+
+  theme_void()+
   scale_fill_discrete(palette = c("gray", "orange", "coral"), 
-                      name = "")
-
-  labs(title = "Estimated Housing Age and and EBLL Incidence in St. Louis County, MN", 
-       subtitle = "Sources: US Census Bureau, MDH",
-       caption = "Prepared by: James Miller")
-
+                      name = "")+
+  annotation_scale(location = "bl",
+                   pad_x = unit(0.3, "cm"),
+                   unit_category = "imperial", 
+                   style = "ticks")+
+  annotation_north_arrow(location = "tr",
+                         pad_y = unit(.7, "cm"),
+                         which_north = "grid",
+                         style = north_arrow_orienteering(text_size = 5), 
+                         height = unit(.7, "cm"), 
+                         width = unit(.4, "cm"))
 ggm_slc
+?geom_text
 
 #plot Duluth tracts
 ggm_dlh <- 
@@ -172,25 +195,32 @@ ggm_dlh <-
           fill = NA,
           color = "black",
           size = 1.2)+
+   coord_sf(xlim = st_bbox(dlh_4269_bb) [c(1, 3)],
+             ylim = st_bbox(dlh_4269_bb)[c(2, 4)])+
   theme_void()+
   scale_fill_discrete(palette = c("gray", "orange", "coral"),
                       name = "")+
-  theme(legend.position = c(0.45,1.2), 
+  theme(legend.position = c(0.53,1.2), 
         legend.direction = "vertical")
-  
+
 ggm_dlh
   
 #inset map
 ggdraw()+
   draw_plot(ggm_slc, 
-            x = -.2)+
+            x = -.35)+
   draw_plot(ggm_dlh,
-            x = 0.35, 
+            x = 0.2, 
             y = 0.25,
             width = .45,
-            height = .45)
-
-  ?cip
+            height = .45)+
+  draw_label("Estimated Housing Age and and EBLL Incidence in St. Louis County, MN",
+             fontface = "bold",
+             x = 0,
+             hjust = -0.1,
+             vjust = -22,
+             size = 14)+
+  theme(plot.margin = margin(0,0,0,0))
 
 #leaflet mapping
 #

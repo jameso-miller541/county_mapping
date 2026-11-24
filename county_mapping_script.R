@@ -36,7 +36,7 @@ lead_exposure_tracts <- left_join(census_tracts, Childhood_Lead_Exposure_testyea
 #
 cities_4269 <- st_transform(cities, crs = 4269)# project to 4269
 #dlh bounding box
-dlh <- filter(cities, FEATURE_NA == "Duluth") #filter to only Duluth
+dlh <- filter(cities_4269, FEATURE_NA == "Duluth") #filter to only Duluth
 
 dlh_4269_bb <- st_as_sfc(st_bbox(dlh)) #get dlh bounding box (for inset)
 
@@ -131,9 +131,9 @@ slc_lead_exposure_tracts <- left_join(slc_lead_exposure_tracts, year_built_perce
 slc_lead_exposure_tracts <- mutate(slc_lead_exposure_tracts, 
                                    risk_label = case_when(
                                      Label == "Significantly higher (1-2 times)" | Label == "Significantly higher (3+ times)" &
-                                       percent_built_before_1970 >= 50 ~ ">50% buildings older than 1970 AND > EBLL incidence",
+                                       percent_built_before_1970 >= 50 ~ ">50% buildings older than 1970 AND High EBLL incidence",
                                      percent_built_before_1970 >= 50 ~ ">50% buildings older than 1970",
-                                     Label == "Significantly higher (1-2 times)" | Label == "Significantly higher (3+ times)" ~ "> EBLL incidence",
+                                     Label == "Significantly higher (1-2 times)" | Label == "Significantly higher (3+ times)" ~ "High EBLL incidence",
                                      T ~ "<50% buildings older than 1970"))
 
 #read exposure tracts as sf
@@ -151,76 +151,100 @@ dlh_exposure_tracts <- st_intersection(slc_lead_exposure_tracts_clip, dlh_4269_b
 #
 #plot county wide census tracts
 ggm_slc <-
-  ggplot(slc_lead_exposure_tracts_clip)+
-  geom_sf(aes(fill = risk_label), 
+  ggplot(slc_lead_exposure_tracts_clip)+ #add slc tracts
+  geom_sf(aes(fill = risk_label), #color tracts by building age/EBLL levle
           alpha = 1, 
           show.legend = F)+
-  geom_sf(data = dlh_4269_bb, 
+  geom_sf(data = dlh_4269_bb, #add bounding box around DLH
           fill = NA,
           color = "black",
-          size = .7)+
-  geom_sf(data = slc_cities_point)+
-  geom_text(data = slc_cities_point, 
+          size = 1)+
+  geom_sf(data = slc_cities_point)+ #add points for Major cities
+  geom_text(data = slc_cities_point, #add text labels for cities
             aes(label = FEATURE_NA,
                 geometry = geometry),
             stat = "sf_coordinates",
             size = 3.5,
             nudge_y = 0,
-            nudge_x = .12)+
-  theme(legend.position = "right", 
-        legend.title.position = "top", 
-        legend.direction = "vertical")+
-  theme_void()+
-  scale_fill_discrete(palette = c("gray", "orange", "coral"), 
-                      name = "")+
-  annotation_scale(location = "bl",
-                   pad_x = unit(0.3, "cm"),
-                   unit_category = "imperial", 
-                   style = "ticks")+
+            nudge_x = .15)+
+  theme_void()+              #remove background
+  scale_fill_discrete(palette = c("#A8B9D4", "orange", "coral"), 
+                      name = "")+ # add palette for risk label
+  annotation_scale(location = "bl", # add and position scale
+                   pad_x = unit(0.45, "cm"),
+                   unit_category = "imperial", #units
+                   style = "ticks")+ #style 
   annotation_north_arrow(location = "tr",
-                         pad_y = unit(.7, "cm"),
+                         pad_y = unit(1, "cm"),
+                         pad_x = unit(.7, "cm"),
                          which_north = "grid",
                          style = north_arrow_orienteering(text_size = 5), 
                          height = unit(.7, "cm"), 
-                         width = unit(.4, "cm"))
+                         width = unit(.4, "cm")) #add, customize, and position north arrow
 ggm_slc
-?geom_text
 
 #plot Duluth tracts
 ggm_dlh <- 
-  ggplot(dlh_exposure_tracts)+
-  geom_sf(aes(fill = risk_label),
+  ggplot(dlh_exposure_tracts)+ #plot tracts only within DLH bounding box
+  geom_sf(aes(fill = risk_label), #fill by risk label
           show.legend = T)+
-  geom_sf(data = dlh_4269_bb, 
+  geom_sf(data = dlh_4269_bb, #add and color bounding box
           fill = NA,
           color = "black",
-          size = 1.2)+
+          size = 1)+
+   geom_sf(data = slc_cities_point, #add major cities (within bounding box)
+           size = 3)+
    coord_sf(xlim = st_bbox(dlh_4269_bb) [c(1, 3)],
-             ylim = st_bbox(dlh_4269_bb)[c(2, 4)])+
+             ylim = st_bbox(dlh_4269_bb)[c(2, 4)])+ #limit map extent to only bounding box
   theme_void()+
-  scale_fill_discrete(palette = c("gray", "orange", "coral"),
+  geom_text(data = slc_cities_point, #add and position labels for major cities
+              aes(label = FEATURE_NA,
+                  geometry = geometry),
+              stat = "sf_coordinates",
+              size = 4,
+              nudge_y = 0,
+              nudge_x = .085)+
+  scale_fill_discrete(palette = c("#A8B9D4", "orange", "coral"), #palette and legend name for risk label
                       name = "")+
-  theme(legend.position = c(0.53,1.2), 
+  theme(legend.position = c(0.4,1.2), #position legend
         legend.direction = "vertical")
 
 ggm_dlh
   
 #inset map
-ggdraw()+
+inset_map <- 
+  ggdraw()+
   draw_plot(ggm_slc, 
-            x = -.35)+
+            x = -.35)+ #add and position county map
   draw_plot(ggm_dlh,
-            x = 0.2, 
+            x = 0.22, 
             y = 0.25,
             width = .45,
-            height = .45)+
+            height = .45)+ #add, position, and size DLH inset
   draw_label("Estimated Housing Age and and EBLL Incidence in St. Louis County, MN",
              fontface = "bold",
              x = 0,
-             hjust = -0.1,
-             vjust = -22,
-             size = 14)+
-  theme(plot.margin = margin(0,0,0,0))
+             hjust = -0.08,
+             vjust = -20,
+             size = 14)+ #title
+  draw_label("Sources: US Census Bureau and MDH",
+             size = 9,
+             vjust = 31,
+             hjust = .65)+ #source
+  draw_label("Prepared by: James Miller",
+             size = 9,
+             vjust = 29,
+             hjust = .5)+ #attribution 
+  draw_line(x = c(0.225, 0.329),
+            y = c(0.045, 0.27), 
+            size = 1)+ #lines for inset
+  draw_line(x = c(0.225, 0.329),
+            y = c(0.15, .68), 
+            size = 1)+ #lines for inset
+  theme(plot.margin = margin(1,1,1,1), #margin
+        plot.background = element_rect(fill = "#FEEFDE")) #background color
+
+inset_map
 
 #leaflet mapping
 #

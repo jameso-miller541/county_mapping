@@ -147,7 +147,7 @@ ggm_slc <- ggplot(slc_lead_exposure_tracts_clip)+
   geom_sf(data = dlh_4269_bb, 
           fill = NA,
           color = "black",
-          size = 1.2)+
+          size = .7)+
   theme(panel.background = element_blank(), 
         axis.text = element_blank(), 
         axis.ticks = element_blank(), 
@@ -164,15 +164,19 @@ ggm_slc <- ggplot(slc_lead_exposure_tracts_clip)+
 ggm_slc
 
 #plot Duluth tracts
-ggm_dlh <- ggplot(dlh_exposure_tracts)+
+ggm_dlh <- 
+  ggplot(dlh_exposure_tracts)+
   geom_sf(aes(fill = risk_label),
-          show.legend = F)+
+          show.legend = T)+
   geom_sf(data = dlh_4269_bb, 
           fill = NA,
           color = "black",
           size = 1.2)+
   theme_void()+
-  scale_fill_discrete(palette = c("gray", "orange", "coral"))
+  scale_fill_discrete(palette = c("gray", "orange", "coral"),
+                      name = "")+
+  theme(legend.position = c(0.45,1.2), 
+        legend.direction = "vertical")
   
 ggm_dlh
   
@@ -181,10 +185,12 @@ ggdraw()+
   draw_plot(ggm_slc, 
             x = -.2)+
   draw_plot(ggm_dlh,
-            x = 0.45, 
+            x = 0.35, 
             y = 0.25,
-            width = 0.5,
-            height = 0.5)
+            width = .45,
+            height = .45)
+
+  ?cip
 
 #leaflet mapping
 #
